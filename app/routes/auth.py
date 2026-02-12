@@ -1,3 +1,4 @@
+from asyncio.log import logger
 from datetime import timedelta
 
 from flask import Blueprint, current_app, jsonify, request
@@ -162,7 +163,7 @@ def register_verify():
     payload = get_request_data()
     email = payload.get("email")
     otp = payload.get("otp")
-    temp_token = payload.get("temp_token")
+    temp_token = request.cookies.get("temp_token") or payload.get("temp_token")
 
     if not all([email, otp, temp_token]):
         return error_response("Missing required fields")
@@ -256,7 +257,7 @@ def resend_otp():
     """Resend OTP with 2-minute cooldown restriction."""
     payload = get_request_data()
     email = payload.get("email")
-    temp_token = payload.get("temp_token")
+    temp_token = request.cookies.get("temp_token") or payload.get("temp_token")
 
     if not all([temp_token]):
         return error_response("Missing required fields")
@@ -477,23 +478,20 @@ def refresh_token():
 @auth_bp.route("/token/validate", methods=["GET"])
 @_rate_limit("20 per minute")
 def validate_token():
-    """
-    Validate access token. If expired, attempt to refresh using refresh token.
-    Returns:
-      - 200: Token is valid
-      - 200 with new tokens: Token was refreshed
-      - 401: Both tokens are invalid/expired
-    """
-    from flask_jwt_extended import verify_jwt_in_request
+    from flask_jwt_extended import decode_token
     from flask_jwt_extended.exceptions import JWTExtendedException
 
+    # Get access token from cookie
+    access_token = request.cookies.get("access_token")
+    
+    if not access_token:
+        return error_response("No access token provided", 401)
+    
     try:
-        # Try to verify access token
-        verify_jwt_in_request(optional=False)
-        user_id = get_jwt_identity()
-        jwt_data = get_jwt()
-
-        # Access token is valid
+        # Decode and validate the access token from cookie
+        jwt_data = decode_token(access_token)
+        user_id = jwt_data.get("sub")
+            
         user = User.query.get(user_id)
         if not user:
             return error_response("User not found", 404)
@@ -511,41 +509,18 @@ def validate_token():
         )
 
     except JWTExtendedException:
-        # Access token is invalid or expired, try to refresh
-        try:
-            verify_jwt_in_request(
-                optional=False, fresh=False
-            )  # This won't help, trying different approach
-        except Exception:
-            pass
-
-        # Try to get refresh token from headers or cookies
-        refresh_token = None
-        auth_header = request.headers.get("Authorization", "")
-
-        if auth_header.startswith("Bearer "):
-            # This would be access token, not refresh
-            pass
-
-        # Try to get refresh token from cookies
+        # Access token is invalid/expired, try refresh token
         refresh_token = request.cookies.get("refresh_token")
-
-        if not refresh_token:
-            # Try to get from Authorization header with "Refresh" prefix
-            refresh_header = request.headers.get("X-Refresh-Token", "")
-            if refresh_header:
-                refresh_token = refresh_header
 
         if not refresh_token:
             return error_response(
                 "Access token expired and no refresh token provided", 401
             )
 
-        # Verify and use refresh token
+        # Decode and validate the refresh token from cookie
         try:
-            verify_jwt_in_request(refresh=True)
-            jwt_data = get_jwt()
-            user_id = get_jwt_identity()
+            jwt_data = decode_token(refresh_token)
+            user_id = jwt_data.get("sub")
             jti = jwt_data.get("jti")
 
             # Find and validate session
