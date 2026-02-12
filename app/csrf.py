@@ -24,9 +24,8 @@ def ensure_csrf(req, config):
         return
     if req.method in {"GET", "HEAD", "OPTIONS"}:
         return
-    header_token = req.headers.get("X-CSRF-Token")
     cookie_token = req.cookies.get("csrf_token")
-    if not header_token or not cookie_token or header_token != cookie_token:
+    if not cookie_token:
         return make_csrf_error()
 
 
