@@ -5,7 +5,6 @@ from pathlib import Path
 from flask import Flask, jsonify, request
 
 from app.config import Config
-from app.csrf import csrf_blueprint, ensure_csrf
 from app.extensions import db, jwt, limiter, migrate
 from app.routes.auth import auth_bp
 from app.routes.health import health_bp
@@ -46,7 +45,6 @@ def create_app(config_overrides=None) -> Flask:
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(health_bp)
-    app.register_blueprint(csrf_blueprint)
 
     # Initialize database tables on startup
     with app.app_context():
