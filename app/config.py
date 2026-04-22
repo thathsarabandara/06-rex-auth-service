@@ -23,9 +23,9 @@ class Config:
 
     OTP_EXPIRES_MINUTES = int(os.getenv("OTP_EXPIRES_MINUTES", "5"))
     RESET_TOKEN_EXPIRES_MINUTES = int(os.getenv("RESET_TOKEN_EXPIRES_MINUTES", "30"))
-    CSRF_PROTECT = _get_bool(os.getenv("CSRF_PROTECT"), True)
-    CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE")
-    CSRF_COOKIE_SECURE = _get_bool(os.getenv("CSRF_COOKIE_SECURE"), False)
+    JWT_COOKIE_SECURE = _get_bool(os.getenv("JWT_COOKIE_SECURE"), False)
+    JWT_COOKIE_SAMESITE = os.getenv("JWT_COOKIE_SAMESITE", "Lax")
+    ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173")
     RATE_LIMIT_ENABLED = _get_bool(os.getenv("RATE_LIMIT_ENABLED"), True)
 
     MAIL_SENDER = os.getenv("MAIL_SENDER")
