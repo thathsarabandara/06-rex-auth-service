@@ -55,8 +55,8 @@ def _set_token_cookies(
         access_token,
         max_age=expires_in,
         httponly=True,
-        secure=current_app.config.get("CSRF_COOKIE_SECURE", False),
-        samesite=current_app.config.get("CSRF_COOKIE_SAMESITE", "None"),
+        secure=current_app.config.get("JWT_COOKIE_SECURE", False),
+        samesite=current_app.config.get("JWT_COOKIE_SAMESITE", "Lax"),
         path="/",
     )
 
@@ -69,8 +69,8 @@ def _set_token_cookies(
         refresh_token,
         max_age=refresh_expires,
         httponly=True,
-        secure=current_app.config.get("CSRF_COOKIE_SECURE", False),
-        samesite=current_app.config.get("CSRF_COOKIE_SAMESITE", "None"),
+        secure=current_app.config.get("JWT_COOKIE_SECURE", False),
+        samesite=current_app.config.get("JWT_COOKIE_SAMESITE", "Lax"),
         path="/",
     )
 
@@ -81,6 +81,8 @@ def _set_token_cookies(
 @_rate_limit("5 per minute")
 def register_initiate():
     payload = get_request_data()
+    first_name = (payload.get("firstName") or "").strip()
+    last_name = (payload.get("lastName") or "").strip()
     username = (payload.get("username") or "").strip()
     email = (payload.get("email") or "").strip()
     password = (payload.get("password") or "").strip()
@@ -108,6 +110,8 @@ def register_initiate():
         username=username,
         email=email,
         password_hash=hashed_password,
+        first_name=first_name,
+        last_name=last_name,
         email_verified=False,
         status=UserStatus.ACTIVE,
     )
@@ -150,8 +154,8 @@ def register_initiate():
             timedelta(minutes=current_app.config["OTP_EXPIRES_MINUTES"]).total_seconds()
         ),
         httponly=True,
-        secure=current_app.config.get("CSRF_COOKIE_SECURE", False),
-        samesite=current_app.config.get("CSRF_COOKIE_SAMESITE", "None"),
+        secure=current_app.config.get("JWT_COOKIE_SECURE", False),
+        samesite=current_app.config.get("JWT_COOKIE_SAMESITE", "Lax"),
         path="/",
     )
     return response
@@ -331,8 +335,8 @@ def resend_otp():
             timedelta(minutes=current_app.config["OTP_EXPIRES_MINUTES"]).total_seconds()
         ),
         httponly=True,
-        secure=current_app.config.get("CSRF_COOKIE_SECURE", False),
-        samesite=current_app.config.get("CSRF_COOKIE_SAMESITE", "None"),
+        secure=current_app.config.get("JWT_COOKIE_SECURE", False),
+        samesite=current_app.config.get("JWT_COOKIE_SAMESITE", "Lax"),
         path="/",
     )
     return response
