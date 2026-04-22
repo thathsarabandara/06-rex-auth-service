@@ -9,9 +9,15 @@ services:
       MYSQL_PASSWORD: auth_pass
       MYSQL_ROOT_PASSWORD: root_pass
     ports:
-      - "3307:3306"
+      - "3309:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
   api:
     build: .
     environment:
@@ -23,7 +29,9 @@ services:
       REFRESH_TOKEN_EXPIRES_DAYS: 7
       OTP_EXPIRES_MINUTES: 5
       RESET_TOKEN_EXPIRES_MINUTES: 20
-      CSRF_PROTECT: "true"
+      JWT_COOKIE_SECURE: "false"
+      JWT_COOKIE_SAMESITE: "Lax"
+      ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:5173,https://rex-47.vercel.app"
       RATE_LIMIT_ENABLED: "true"
       MAIL_SENDER: stormprojects47@gmail.com
       FRONTEND_BASE_URL: https://rex-47.vercel.app
@@ -35,7 +43,8 @@ services:
       SMTP_USE_TLS: "true"
       SMTP_TIMEOUT: "10"
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
       - "8000:8000"
 
