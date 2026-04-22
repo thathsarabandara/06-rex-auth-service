@@ -30,6 +30,9 @@ from app.services.token_service import issue_tokens
 from app.utils.request_handlers import get_request_data
 from app.utils.responses import error_response
 from app.utils.tenantidGeneratory import get_or_create_tenant
+import random
+import re
+import string
 from app.utils.validators import validate_email_format, validate_password_strength
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
@@ -83,26 +86,35 @@ def register_initiate():
     payload = get_request_data()
     first_name = (payload.get("firstName") or "").strip()
     last_name = (payload.get("lastName") or "").strip()
-    username = (payload.get("username") or "").strip()
     email = (payload.get("email") or "").strip()
     password = (payload.get("password") or "").strip()
 
-    if not all([username, email, password]):
+    if not all([email, password]):
         return error_response("Missing required fields")
     if not validate_email_format(email):
         return error_response("Invalid email")
     if not validate_password_strength(password):
         return error_response("Weak password")
 
+    # Auto-generate username
+    base_username = (
+        re.sub(r"[^a-z0-9]", "", (first_name + last_name).lower())
+        if (first_name and last_name)
+        else email.split("@")[0].lower()
+    )
+    if not base_username:
+        base_username = "user"
+
+    username = base_username
+    # Check if username exists, if so append random digits
+    while User.query.filter_by(username=username).first():
+        username = f"{base_username}{random.randint(1000, 9999)}"
+
     tenant_id = get_or_create_tenant(email, username)
 
     existing = User.query.filter_by(email=email).first()
     if existing:
         return error_response("Email already registered", 409)
-
-    existing_username = User.query.filter_by(username=username).first()
-    if existing_username:
-        return error_response("Username already registered", 409)
 
     hashed_password = hash_password(password)
     user = User(
