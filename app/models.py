@@ -51,6 +51,8 @@ class User(db.Model):
     username = db.Column(db.String(80), nullable=False)
     email = db.Column(db.String(255), nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
+    first_name = db.Column(db.String(100))
+    last_name = db.Column(db.String(100))
     email_verified = db.Column(db.Boolean, default=False, nullable=False)
     status = db.Column(
         db.Enum(UserStatus),

@@ -15,7 +15,7 @@ A secure, production-ready authentication microservice for the **REX-47 Smart Ho
 
 ### Security
 - **HttpOnly Cookies**: Tokens stored securely in httpOnly, Secure, SameSite cookies
-- **CSRF Protection**: Built-in CSRF token validation for all state-changing operations
+- **CORS Protection**: Configurable allowed origins for cross-origin requests
 - **Rate Limiting**: Per-endpoint rate limits to prevent brute-force attacks
 - **Account Lockout**: Automatic temporary and permanent account banning after failed attempts
 - **Password Requirements**: Enforced password strength validation (minimum 8 chars, mixed case, numbers, symbols)

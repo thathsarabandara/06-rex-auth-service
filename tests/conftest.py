@@ -23,7 +23,6 @@ def app():
             "TESTING": True,
             "SQLALCHEMY_DATABASE_URI": f"sqlite:///{db_path}",
             "RATE_LIMIT_ENABLED": False,
-            "CSRF_PROTECT": False,
             "SECRET_KEY": "4d666089fc013268197ab370ad619b96",
             "JWT_SECRET_KEY": "FvweS0L9ZVafXVuuKz6kK8ZRv1WuyaxV5BMVHamQg58H03NsmS90KuEvhMxQUvnXAUbrHTrHtIuYgeeu8D46sF",
         }

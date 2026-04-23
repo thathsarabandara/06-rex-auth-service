@@ -3,9 +3,9 @@ import time
 from pathlib import Path
 
 from flask import Flask, jsonify, request
+from flask_cors import CORS
 
 from app.config import Config
-from app.csrf import csrf_blueprint, ensure_csrf
 from app.extensions import db, jwt, limiter, migrate
 from app.routes.auth import auth_bp
 from app.routes.health import health_bp
@@ -35,18 +35,27 @@ def create_app(config_overrides=None) -> Flask:
 
     # JWT configuration for cookie support
     app.config["JWT_TOKEN_LOCATION"] = ["headers", "cookies"]
-    app.config["JWT_COOKIE_SECURE"] = app.config.get("CSRF_COOKIE_SECURE", False)
-    app.config["JWT_COOKIE_CSRF_PROTECT"] = True
-    app.config["JWT_COOKIE_SAMESITE"] = app.config.get("CSRF_COOKIE_SAMESITE", "None")
+    app.config["JWT_COOKIE_SECURE"] = app.config.get("JWT_COOKIE_SECURE", False)
+    app.config["JWT_COOKIE_CSRF_PROTECT"] = False
+    app.config["JWT_COOKIE_SAMESITE"] = app.config.get("JWT_COOKIE_SAMESITE", "Lax")
 
     db.init_app(app)
     migrate.init_app(app, db)
     jwt.init_app(app)
     limiter.init_app(app)
 
+    # Configure CORS with allowed origins
+    allowed_origins = app.config.get("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173")
+    CORS(
+        app,
+        origins=allowed_origins.split(","),
+        supports_credentials=True,
+        allow_headers=["Content-Type", "Authorization"],
+        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]
+    )
+
     app.register_blueprint(auth_bp)
     app.register_blueprint(health_bp)
-    app.register_blueprint(csrf_blueprint)
 
     # Initialize database tables on startup
     with app.app_context():
@@ -75,25 +84,7 @@ def create_app(config_overrides=None) -> Flask:
                         f"{max_retries} attempts: {str(e)}"
                     )
 
-    @app.before_request
-    def _csrf_protect():
-        response = ensure_csrf(request, app.config)
-        if response:
-            return response
 
-    @app.before_request
-    def _handle_preflight():
-        """Handle preflight requests."""
-        if request.method == "OPTIONS":
-            response = jsonify({"status": "ok"})
-            response.headers.add("Access-Control-Allow-Origin", "*")
-            response.headers.add(
-                "Access-Control-Allow-Headers", "Content-Type,X-CSRF-Token"
-            )
-            response.headers.add(
-                "Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS"
-            )
-            return response
 
     @app.errorhandler(404)
     def _not_found(_error):

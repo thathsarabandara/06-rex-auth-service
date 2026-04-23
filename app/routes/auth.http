@@ -5,25 +5,26 @@ Content-Type: application/json
 {
   "username": "demo",
   "email": "demo@example.com",
-  "password": "StrongPass1",
+  "password": "StrongPass1"
 }
 
 ### Register verify
+### temp_token (checks access token from cookie)
 POST http://localhost:8000/auth/register/verify
 Content-Type: application/json
 
 {
+  "email": "demo@example.com",
   "otp": "123456",
-  "temp_token": "TOKEN_FROM_STEP1"
 }
 
 ### Resend OTP
+### temp_token (checks access token from cookie)
 POST http://localhost:8000/auth/register/resend-otp
 Content-Type: application/json
 
 {
   "email": "demo@example.com",
-  "temp_token": "TOKEN_FROM_STEP1"
 }
 
 ### Login
@@ -32,34 +33,33 @@ Content-Type: application/json
 
 {
   "email": "demo@example.com",
-  "password": "StrongPass1",
+  "password": "StrongPass1"
 }
 
-### Refresh token
+### Refresh token (from Authorization header)
 POST http://localhost:8000/auth/token/refresh
 Authorization: Bearer YOUR_REFRESH_TOKEN
 
-### Validate token (checks access token, refreshes if expired)
+### Validate token (checks access token from cookie, refreshes if expired using refresh cookie)
+### Tokens are read from httpOnly cookies, not from Authorization header
+### Requires cookies: access_token (optional for refresh), refresh_token (optional as fallback)
 GET http://localhost:8000/auth/token/validate
-Authorization: Bearer YOUR_ACCESS_TOKEN
-X-Refresh-Token: YOUR_REFRESH_TOKEN
 
 ### Forgot password
 POST http://localhost:8000/auth/password/forgot
 Content-Type: application/json
 
 {
-  "email": "demo@example.com",
+  "email": "demo@example.com"
 }
 
 ### Validate reset token
 GET http://localhost:8000/auth/password/reset/validate?token=RESET_TOKEN_FROM_EMAIL
 
 ### Reset password
-POST http://localhost:8000/auth/password/reset
+POST http://localhost:8000/auth/password/reset?token=RESET_TOKEN_FROM_EMAIL
 Content-Type: application/json
 
 {
-  "reset_token": "RESET_TOKEN_FROM_EMAIL",
   "new_password": "StrongerPass2"
 }

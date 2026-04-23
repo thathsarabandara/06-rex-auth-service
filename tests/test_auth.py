@@ -258,16 +258,3 @@ class TestHealth:
         assert response.status_code == 200
         data = response.get_json()
         assert data["status"] == "ok"
-
-
-class TestCSRF:
-    def test_csrf_token_generation(self, client):
-        response = client.get("/auth/csrf")
-        assert response.status_code == 200
-        data = response.get_json()
-        assert "csrf_token" in data
-        assert (
-            "csrf_token" in response.headers.getlist("Set-Cookie")[0]
-            if response.headers.getlist("Set-Cookie")
-            else None
-        )
