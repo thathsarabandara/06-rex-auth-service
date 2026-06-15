@@ -35,7 +35,7 @@ import re
 import string
 from app.utils.validators import validate_email_format, validate_password_strength
 
-auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
+auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
 
 # Rate limiting decorator - can be disabled via config

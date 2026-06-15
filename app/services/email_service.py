@@ -1,128 +1,10 @@
 import logging
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from pathlib import Path
-
-from flask import current_app, render_template_string
+import urllib.request
+import json
+from flask import current_app
+from app.models import User
 
 logger = logging.getLogger(__name__)
-
-
-def _load_template(template_name: str) -> tuple:
-    """Load HTML and text templates for an email."""
-    template_dir = Path(__file__).parent.parent / "templates" / "emails"
-
-    html_path = template_dir / f"{template_name}.html"
-    txt_path = template_dir / f"{template_name}.txt"
-
-    html_content = html_path.read_text() if html_path.exists() else None
-    txt_content = txt_path.read_text() if txt_path.exists() else None
-
-    current_app.logger.debug(
-        f"[EMAIL] Template loaded: {template_name} "
-        f"(html={html_path.exists()}, txt={txt_path.exists()})"
-    )
-
-    return html_content, txt_content
-
-
-def render_email_template(template_name: str, context: dict) -> tuple:
-    """Render email templates with context variables."""
-    try:
-        current_app.logger.debug(
-            f"[EMAIL] Rendering template: {template_name} "
-            f"with context keys: {list(context.keys())}"
-        )
-        html_template, txt_template = _load_template(template_name)
-
-        html_body = (
-            render_template_string(html_template, **context) if html_template else None
-        )
-        txt_body = (
-            render_template_string(txt_template, **context) if txt_template else None
-        )
-
-        current_app.logger.debug(
-            f"[EMAIL] Template rendered successfully "
-            f"(html_size={len(html_body) if html_body else 0}, "
-            f"txt_size={len(txt_body) if txt_body else 0})"
-        )
-
-        return html_body, txt_body
-    except Exception as e:
-        current_app.logger.error(
-            f"[EMAIL] Template rendering error for {template_name}: {str(e)}"
-        )
-        raise
-
-
-def _send_via_smtp(to_email: str, subject: str, html_body: str, txt_body: str) -> bool:
-    """Send email via SMTP server."""
-    try:
-        current_app.logger.info(f"[EMAIL] Attempting SMTP send to: {to_email}")
-
-        smtp_server = current_app.config.get("SMTP_SERVER")
-        smtp_port = int(current_app.config.get("SMTP_PORT", 587))
-        smtp_username = current_app.config.get("SMTP_USERNAME")
-        smtp_password = current_app.config.get("SMTP_PASSWORD")
-        use_tls = current_app.config.get("SMTP_USE_TLS", True)
-        timeout = int(current_app.config.get("SMTP_TIMEOUT", 10))
-        sender = current_app.config.get("MAIL_SENDER")
-
-        current_app.logger.debug(
-            f"[EMAIL] SMTP Config - Server: {smtp_server}:{smtp_port}, "
-            f"TLS: {use_tls}, Timeout: {timeout}s"
-        )
-
-        # Create message
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = str(subject)
-        msg["From"] = str(sender)
-        msg["To"] = str(to_email)
-
-        # Add text and HTML parts
-        if txt_body:
-            msg.attach(MIMEText(txt_body, "plain"))
-            current_app.logger.debug(
-                f"[EMAIL] Attached text body ({len(txt_body)} chars)"
-            )
-        if html_body:
-            msg.attach(MIMEText(html_body, "html"))
-            current_app.logger.debug(
-                f"[EMAIL] Attached HTML body ({len(html_body)} chars)"
-            )
-
-        # Send via SMTP
-        current_app.logger.debug(
-            f"[EMAIL] Connecting to SMTP server {smtp_server}:{smtp_port}..."
-        )
-        with smtplib.SMTP(smtp_server, smtp_port, timeout=timeout) as server:
-            current_app.logger.debug("[EMAIL] Connected to SMTP server")
-            if use_tls:
-                server.starttls()
-                current_app.logger.debug("[EMAIL] TLS enabled")
-            server.login(smtp_username, smtp_password)
-            current_app.logger.debug("[EMAIL] SMTP login successful")
-            server.sendmail(sender, [to_email], msg.as_string())
-            current_app.logger.debug("[EMAIL] Email data sent to server")
-
-        current_app.logger.info(
-            f"[EMAIL] ✓ Email sent successfully to {to_email} " f"(Subject: {subject})"
-        )
-        return True
-
-    except smtplib.SMTPAuthenticationError as e:
-        current_app.logger.error(f"[EMAIL] ✗ SMTP authentication failed: {str(e)}")
-        return False
-    except smtplib.SMTPException as e:
-        current_app.logger.error(f"[EMAIL] ✗ SMTP error: {str(e)}")
-        return False
-    except Exception as e:
-        current_app.logger.error(
-            f"[EMAIL] ✗ Error sending email: " f"{type(e).__name__}: {str(e)}"
-        )
-        return False
 
 
 def send_email(
@@ -133,7 +15,7 @@ def send_email(
     context: dict = None,
 ) -> None:
     """
-    Send email with template rendering support.
+    Delegate email sending to the centralized Notification Engine.
 
     Args:
         to_email: Recipient email address
@@ -152,72 +34,55 @@ def send_email(
             f"Subject: {subject}, Template: {template_name}"
         )
 
-        sender = current_app.config.get("MAIL_SENDER", "no-reply@example.com")
-        smtp_enabled = current_app.config.get("SMTP_ENABLED", False)
+        # 1. Resolve user ID from email, or fallback to default system UUID
+        user_id = "00000000-0000-0000-0000-000000000000"
+        try:
+            user = User.query.filter_by(email=to_email).first()
+            if user:
+                user_id = str(user.id)
+        except Exception as db_err:
+            current_app.logger.warning(f"[EMAIL] Failed to lookup user ID from database: {str(db_err)}")
 
-        current_app.logger.debug(
-            f"[EMAIL] Config - SMTP_ENABLED: {smtp_enabled}, " f"Sender: {sender}"
+        # 2. Map local template name to eventType
+        event_type = "GENERIC"
+        if template_name:
+            event_type = f"AUTH_{template_name.upper()}"
+
+        # 3. Build HTTP Payload
+        payload = {
+            "userId": user_id,
+            "title": subject,
+            "message": body or "",
+            "channels": ["EMAIL"],
+            "severity": "MEDIUM",
+            "category": "AUTH",
+            "eventType": event_type,
+            "context": {
+                "email": to_email,
+                **(context or {})
+            }
+        }
+
+        # 4. Dispatch POST request via urllib.request
+        notification_url = f"{current_app.config['NOTIFICATION_SERVICE_URL']}/api/v1/notifications"
+        current_app.logger.info(f"[EMAIL] Delegating email notification to: {notification_url}")
+
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(
+            notification_url,
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST"
         )
 
-        if template_name and context is None:
-            context = {}
+        with urllib.request.urlopen(req, timeout=10) as response:
+            status_code = response.getcode()
+            response_body = response.read().decode("utf-8")
+            current_app.logger.info(f"[EMAIL] Centralized engine responded with status {status_code}: {response_body}")
 
-        if template_name:
-            context.setdefault("support_email", current_app.config.get("MAIL_SENDER"))
-            context.setdefault(
-                "support_url",
-                f"{current_app.config.get('FRONTEND_BASE_URL')}/support",
-            )
-            context.setdefault(
-                "privacy_url",
-                f"{current_app.config.get('FRONTEND_BASE_URL')}/privacy",
-            )
-            context.setdefault(
-                "terms_url",
-                f"{current_app.config.get('FRONTEND_BASE_URL')}/terms",
-            )
-
-            current_app.logger.debug("[EMAIL] Rendering template with context")
-            html_body, txt_body = render_email_template(template_name, context)
-        else:
-            html_body = None
-            txt_body = body
-            current_app.logger.debug("[EMAIL] Using custom body (no template)")
-
-        if smtp_enabled:
-            current_app.logger.info(
-                "[EMAIL] SMTP_ENABLED=true, attempting to send via SMTP"
-            )
-            success = _send_via_smtp(to_email, subject, html_body, txt_body)
-            if not success:
-                current_app.logger.warning("[EMAIL] Failed to send via SMTP")
-        else:
-            current_app.logger.info(
-                "[EMAIL] SMTP_ENABLED=false - Email logged to "
-                "console/logs instead of sending"
-            )
-            current_app.logger.info("====== EMAIL PREVIEW ======")
-            current_app.logger.info(f"[EMAIL] To: {to_email}")
-            current_app.logger.info(f"[EMAIL] From: {sender}")
-            current_app.logger.info(f"[EMAIL] Subject: {subject}")
-            current_app.logger.info("[EMAIL] ----- TEXT BODY -----")
-            if txt_body:
-                current_app.logger.info(f"[EMAIL] {txt_body}")
-            else:
-                current_app.logger.info("[EMAIL] (no text body)")
-            current_app.logger.info("[EMAIL] ----- HTML BODY -----")
-            if html_body:
-                html_preview = (
-                    f"[EMAIL] {html_body[:500]}..."
-                    if len(html_body) > 500
-                    else f"[EMAIL] {html_body}"
-                )
-                current_app.logger.info(html_preview)
-            else:
-                current_app.logger.info("[EMAIL] (no HTML body)")
-            current_app.logger.info("=============================\n")
     except Exception as e:
         current_app.logger.error(
-            f"[EMAIL] Unexpected error in send_email: {type(e).__name__}: {str(e)}"
+            f"[EMAIL] Unexpected error delegating email to notification engine: {type(e).__name__}: {str(e)}"
         )
         current_app.logger.exception("[EMAIL] Full exception trace:")
+
