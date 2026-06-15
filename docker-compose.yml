@@ -1,52 +1,16 @@
 version: "3.9"
 
 services:
-  db:
-    image: mysql:latest
-    environment:
-      MYSQL_DATABASE: auth_db
-      MYSQL_USER: auth_user
-      MYSQL_PASSWORD: auth_pass
-      MYSQL_ROOT_PASSWORD: root_pass
-    ports:
-      - "3309:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-      start_period: 30s
   api:
     build: .
-    environment:
-      FLASK_ENV: production
-      SECRET_KEY: 4d666089fc013268197ab370ad619b96
-      JWT_SECRET_KEY: FvweS0L9ZVafXVuuKz6kK8ZRv1WuyaxV5BMVHamQg58H03NsmS90KuEvhMxQUvnXAUbrHTrHtIuYgeeu8D46sF
-      DATABASE_URL: mysql+pymysql://auth_user:auth_pass@db:3306/auth_db
-      ACCESS_TOKEN_EXPIRES_MINUTES: 10
-      REFRESH_TOKEN_EXPIRES_DAYS: 7
-      OTP_EXPIRES_MINUTES: 5
-      RESET_TOKEN_EXPIRES_MINUTES: 20
-      JWT_COOKIE_SECURE: "false"
-      JWT_COOKIE_SAMESITE: "Lax"
-      ALLOWED_ORIGINS: "http://localhost:3000,http://localhost:5173,https://rex-47.vercel.app"
-      RATE_LIMIT_ENABLED: "true"
-      MAIL_SENDER: stormprojects47@gmail.com
-      FRONTEND_BASE_URL: https://rex-47.vercel.app
-      SMTP_ENABLED: "true"
-      SMTP_SERVER: smtp.gmail.com
-      SMTP_PORT: "587"
-      SMTP_USERNAME: "stormprojects47@gmail.com"
-      SMTP_PASSWORD: "dutrpeztytpepvzi"
-      SMTP_USE_TLS: "true"
-      SMTP_TIMEOUT: "10"
-    depends_on:
-      db:
-        condition: service_healthy
+    env_file:
+      - .env
     ports:
-      - "8000:8000"
+      - "9001:9001"
+    networks:
+      - rex_shared_network
 
-volumes:
-  mysql_data:
+networks:
+  rex_shared_network:
+    external: true
+    name: rex_shared_network
