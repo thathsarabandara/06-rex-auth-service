@@ -30,6 +30,7 @@ class Config:
 
     MAIL_SENDER = os.getenv("MAIL_SENDER")
     FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL")
+    NOTIFICATION_SERVICE_URL = os.getenv("NOTIFICATION_SERVICE_URL", "http://rex-notification-service:9008")
 
     SMTP_ENABLED = _get_bool(os.getenv("SMTP_ENABLED"), False)
     SMTP_SERVER = os.getenv("SMTP_SERVER", "localhost")
