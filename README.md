@@ -1,149 +1,158 @@
-# REX-47 Authentication Microservice
+# 🔐 REX-47 Auth Service
 
-A secure, production-ready authentication microservice for the **REX-47 Smart Home Assistant Robot**. Built with Flask and designed to handle multi-tenant user registration, login, OTP verification, and password management with enterprise-grade security.
+> **Repository `06`** · The dedicated identity and access management microservice for the REX-47 platform. Handles secure user registration, JWT lifecycle, and role-based access control.
 
-> Part of the REX-47 ecosystem providing secure identity and access management for the home automation system.
-
-## 🌟 Features
-
-### Core Authentication
-- **Multi-Tenant Support**: Isolate users and data per tenant
-- **OTP Verification**: 6-digit OTP via email with 2-minute resend cooldown
-- **Secure Login**: Argon2 password hashing with progressive login penalties
-- **Session Management**: Rotating refresh tokens with automatic revocation
-- **Token Validation**: Real-time token status checking with automatic refresh capability
-
-### Security
-- **HttpOnly Cookies**: Tokens stored securely in httpOnly, Secure, SameSite cookies
-- **CORS Protection**: Configurable allowed origins for cross-origin requests
-- **Rate Limiting**: Per-endpoint rate limits to prevent brute-force attacks
-- **Account Lockout**: Automatic temporary and permanent account banning after failed attempts
-- **Password Requirements**: Enforced password strength validation (minimum 8 chars, mixed case, numbers, symbols)
-
-### Advanced Features
-- **Email Notifications**: OTP, password reset, and welcome emails via SMTP
-- **Password Reset**: Single-use tokens with expiration
-- **Device Tracking**: Store device info and IP addresses for security audits
-- **Activity Logging**: Comprehensive logging of all auth events
-- **Database Migrations**: Alembic-based version control for schema changes
-
-## 📋 System Requirements
-
-- Python 3.11+
-- MySQL 8.0+ / MariaDB 10.5+
-- Redis (optional, for production rate limiting)
-- Docker & Docker Compose (recommended)
-
-## 🚀 Quick Start
-
-### Using Docker (Recommended)
-
-```bash
-cd rex-auth-server
-docker-compose up --build
-```
-
-API available at `http://localhost:8000`
-
-### Local Development
-
-```bash
-python -m venv myenv
-source myenv/bin/activate
-pip install -r requirements-dev.txt
-cp .env.example .env
-# Edit .env with your credentials
-flask db upgrade
-python -m flask --app manage.py run --port 8000
-```
-
-## 🔧 Configuration
-
-See `.env.example` for all configuration options. Key settings:
-
-```env
-SMTP_ENABLED=true
-SMTP_SERVER=smtp.gmail.com
-SMTP_USERNAME=your-email@gmail.com
-SMTP_PASSWORD=your-app-password
-```
-
-## 📡 API Endpoints
-
-### Authentication
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/auth/register/initiate` | Start registration |
-| POST | `/auth/register/verify` | Verify OTP |
-| POST | `/auth/register/resend-otp` | Resend OTP |
-| POST | `/auth/login` | User login |
-| GET | `/auth/token/validate` | Check & auto-refresh token |
-| POST | `/auth/token/refresh` | Refresh token |
-
-### Password Management
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/auth/password/forgot` | Request reset |
-| GET | `/auth/password/reset/validate` | Validate token |
-| POST | `/auth/password/reset` | Reset password |
-
-## 🔒 Security
-
-- **Account Lockout**: 4 failures = 1h ban, 5 = 6h ban, 6+ = permanent
-- **OTP**: 3 attempts max, 5 min validity, 2 min resend cooldown
-- **Tokens**: 10-min access + 7-day refresh in httpOnly cookies
-- **Password**: 8+ chars, uppercase, lowercase, numbers, symbols
-
-## 🧪 Testing
-
-```bash
-make test           # Run tests
-make coverage       # Coverage report
-make lint          # Lint check
-make format        # Auto-format
-```
-
-Use `app/routes/auth.http` with VS Code REST Client for manual testing.
-
-## 📊 Database
-
-Key tables:
-- `tenants`: Multi-tenant isolation
-- `users`: User accounts
-- `otp_sessions`: OTP requests
-- `auth_sessions`: Login sessions
-- `password_reset_tokens`: Reset links
-- `login_attempts`: Security tracking
-
-## 🐛 Troubleshooting
-
-**Database not connecting:**
-```bash
-docker-compose ps
-docker-compose logs db
-docker-compose down -v && docker-compose up --build
-```
-
-**Email not sending:**
-- Check `SMTP_ENABLED=true`
-- Verify credentials
-- Check logs: `docker logs rex-auth-server_api_1 | grep EMAIL`
-
-**Token errors:**
-- Verify `JWT_SECRET_KEY` is set
-- Check expiration times
-- Ensure cookies are allowed
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file
-
-## 🔗 Related Projects
-
-- **REX-47**: Smart Home Assistant Robot
-- **REX Frontend**: Web dashboard
-- **REX Gateway**: API gateway
+[![Platform](https://img.shields.io/badge/Platform-Backend-blue)]()
+[![Language](https://img.shields.io/badge/Language-JavaScript-F7DF1E?logo=javascript)]()
+[![Framework](https://img.shields.io/badge/Framework-Express-000000?logo=express)]()
+[![Database](https://img.shields.io/badge/Database-MongoDB-47A248?logo=mongodb)]()
+[![Security](https://img.shields.io/badge/Security-JWT%20%7C%20Bcrypt-FF4B4B)]()
 
 ---
 
-**Made with ❤️ for REX-47 Smart Home Assistant Robot**
+## 📋 Table of Contents
+
+- [Overview](#-what-is-this-repository)
+- [Architecture](#-architecture)
+- [Features](#-features)
+- [Getting Started](#-getting-started)
+- [Authentication Flow](#-authentication-flow)
+- [Database Schema](#-database-schema)
+- [Dependencies](#-dependencies)
+- [Related Repositories](#-related-repositories)
+
+---
+
+## 🧭 What Is This Repository?
+
+This is the **central authentication authority** for the entire REX-47 ecosystem. All login requests, token validations, and permission checks are processed here before the API Gateway allows requests to touch the robot's core systems.
+
+**Key Highlights:**
+- ✅ **Stateless JWT Auth:** Issues signed JSON Web Tokens for scalable, stateless session management across microservices.
+- ✅ **Role-Based Access Control (RBAC):** Differentiates between 'Admin', 'Operator', and 'Viewer' privileges.
+- ✅ **Secure Password Hashing:** Utilizes Bcrypt for robust password salting and hashing.
+- ✅ **OTP & Recovery Flows:** Built-in email integration for password resets and identity verification.
+
+---
+
+## 🏗️ Architecture
+
+### Directory Structure
+
+```
+06-rex-auth-service/
+├── src/
+│   ├── config/               ← Environment variables and DB connection logic
+│   ├── controllers/          ← Business logic for auth endpoints
+│   ├── middlewares/          ← JWT validation and role-checking guards
+│   ├── models/               ← Mongoose schemas (User, Role, Token)
+│   ├── routes/               ← Express route definitions (/register, /login)
+│   ├── utils/                ← Email senders, OTP generators, Token signers
+│   └── index.js              ← Service entry point
+├── .env.example              ← Environment template file
+├── docker-compose.yml        ← Local development DB/service definitions
+├── Dockerfile                ← Container build instructions
+├── package.json              ← Dependencies and scripts
+└── README.md                 ← This documentation
+```
+
+---
+
+## 🎨 Features
+
+### 👤 **User Management**
+
+| Feature | Description |
+|---------|-------------|
+| **Registration** | Secure account creation with email validation and strict password requirements. |
+| **Profile Management** | Endpoints to update metadata, avatars, and contact information. |
+| **Account Locking** | Security measure preventing brute force after multiple failed login attempts. |
+
+### 🔑 **Token & Session Management**
+
+| Feature | Description |
+|---------|-------------|
+| **JWT Generation** | Issues short-lived Access Tokens and long-lived Refresh Tokens. |
+| **Token Invalidation** | Robust logout mechanism that blacklists compromised or active tokens. |
+| **Middleware Guards** | Reusable middleware ensuring `verifyToken` and `isAdmin` checks pass. |
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Node.js** ≥ 18.x
+- **MongoDB** (Local instance or Atlas URI)
+
+### Installation
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/thathsarabandara/06-rex-auth-service.git
+cd 06-rex-auth-service
+
+# 2. Install dependencies
+npm install
+
+# 3. Configure environment variables
+cp .env.example .env
+```
+
+### Environment Configuration
+
+Ensure you have a strong JWT Secret configured in your `.env` file:
+
+```env
+PORT=5001
+NODE_ENV=development
+
+# Database
+MONGO_URI=mongodb://localhost:27017/rex-auth
+
+# Security
+JWT_SECRET=your_super_secret_key_here
+JWT_EXPIRES_IN=1h
+REFRESH_TOKEN_SECRET=your_refresh_secret
+```
+
+### Running the Application
+
+```bash
+# Development mode with Nodemon
+npm run dev
+
+# Production mode
+npm start
+```
+
+---
+
+## 🔐 Authentication Flow
+
+1. **Client Request:** The web or mobile app sends credentials to the API Gateway.
+2. **Proxy:** The API Gateway proxies the request to the Auth Service.
+3. **Validation:** The Auth Service verifies the Bcrypt hash against the database.
+4. **Token Issuance:** If valid, an Access Token (JWT) is returned to the client.
+5. **Subsequent Requests:** The client attaches the JWT in the `Authorization: Bearer <token>` header for all future requests to the Robot or Telemetry services.
+
+---
+
+## 📦 Dependencies
+
+### Core
+- `express` — Web framework
+- `mongoose` — MongoDB object modeling tool
+
+### Security
+- `bcryptjs` — Password hashing and salting
+- `jsonwebtoken` — Token signing and verification
+- `express-validator` — Request body sanitization
+
+---
+
+## 🔗 Related Repositories
+
+- [05-rex-api-gateway](../05-rex-api-gateway) — Proxies traffic to this service.
+- [03-rex-web-dashbaord](../03-rex-web-dashbaord) — The frontend interface utilizing these auth flows.
+- [04-rex-mobile-app](../04-rex-mobile-app) — The mobile interface utilizing these auth flows.
